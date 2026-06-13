@@ -499,6 +499,9 @@ function startRecording() {
     if (currentMarker) { map.removeLayer(currentMarker); currentMarker = null; }
   }
 
+  // Força o Leaflet a recalcular tamanho após a div aparecer na tela
+  setTimeout(() => { map.invalidateSize(); }, 100);
+
   recording = true;
   startTimer();
 

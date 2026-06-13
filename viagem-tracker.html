@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ViaTrack</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0D0D0F;
+    --surface: #16161A;
+    --surface2: #1E1E24;
+    --border: #2A2A32;
+    --text: #F0F0F4;
+    --muted: #6B6B7A;
+    --accent: #00E5A0;
+    --danger: #FF4455;
+    --warn: #FFB020;
+    --speed-low: #00E5A0;
+    --speed-mid: #FFB020;
+    --speed-high: #FF4455;
+  }
+
+  html, body {
+    height: 100%; width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+  }
+
+  /* TELA INICIAL */
+  #screen-home {
+    display: flex; flex-direction: column;
+    height: 100vh; padding: 32px 24px 40px;
+    background: var(--bg);
+  }
+  .home-logo {
+    font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: auto;
+  }
+  .home-logo span { color: var(--accent); }
+  .home-hero {
+    flex: 1; display: flex; flex-direction: column;
+    justify-content: center; gap: 8px;
+  }
+  .home-hero h1 {
+    font-size: 42px; font-weight: 700; line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .home-hero h1 em { color: var(--accent); font-style: normal; }
+  .home-hero p {
+    font-size: 15px; color: var(--muted); line-height: 1.5;
+    margin-top: 8px;
+  }
+  .home-stats {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px; margin: 32px 0;
+  }
+  .home-stat {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px 12px; text-align: center;
+  }
+  .home-stat-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 22px; font-weight: 600; color: var(--accent);
+  }
+  .home-stat-lbl { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .btn-primary {
+    width: 100%; padding: 18px; border: none; border-radius: 14px;
+    background: var(--accent); color: #000;
+    font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700;
+    letter-spacing: 0.02em; cursor: pointer;
+    transition: transform 0.1s, opacity 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-primary:active { transform: scale(0.97); opacity: 0.9; }
+  .btn-secondary {
+    width: 100%; padding: 14px; border: 1px solid var(--border); border-radius: 14px;
+    background: transparent; color: var(--text);
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 500;
+    cursor: pointer; margin-top: 10px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* TELA DE GRAVAÇÃO */
+  #screen-recording { display: none; flex-direction: column; height: 100vh; }
+
+  #map { flex: 1; min-height: 0; }
+
+  /* HUD overlay no mapa */
+  .map-hud {
+    position: absolute; top: 12px; left: 0; right: 0;
+    z-index: 1000; pointer-events: none;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 0 12px;
+  }
+  .hud-speed {
+    background: rgba(13,13,15,0.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 10px 18px; pointer-events: auto;
+  }
+  .hud-speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 38px; font-weight: 600; line-height: 1;
+    color: var(--accent); transition: color 0.3s;
+  }
+  .hud-speed-unit { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .hud-status {
+    background: rgba(13,13,15,0.92); backdrop-filter: blur(8px);
+    border: 1px solid var(--border); border-radius: 14px;
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+    pointer-events: auto;
+  }
+  .hud-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.5s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+  }
+  .hud-status-txt { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; }
+  .hud-time { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); }
+
+  /* Painel inferior */
+  .bottom-panel {
+    background: var(--surface); border-top: 1px solid var(--border);
+    padding: 16px 20px 32px; z-index: 1000;
+  }
+  .mini-kpis {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px; margin-bottom: 16px;
+  }
+  .mini-kpi { text-align: center; }
+  .mini-kpi-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px; font-weight: 600;
+  }
+  .mini-kpi-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+
+  .btn-row { display: flex; gap: 10px; }
+  .btn-stop {
+    flex: 1; padding: 16px; border: none; border-radius: 12px;
+    background: var(--danger); color: #fff;
+    font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 700;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+  .btn-poi {
+    padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px;
+    background: var(--surface2); color: var(--text);
+    font-family: 'Inter', sans-serif; font-size: 15px;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Modal POI */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    z-index: 2000; align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet {
+    background: var(--surface); border-radius: 20px 20px 0 0;
+    width: 100%; padding: 20px 20px 40px;
+    border-top: 1px solid var(--border);
+  }
+  .modal-handle {
+    width: 36px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 0 auto 20px;
+  }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .poi-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+  .poi-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    cursor: pointer; -webkit-tap-highlight-color: transparent;
+    font-family: 'Inter', sans-serif; color: var(--text);
+  }
+  .poi-btn:active { border-color: var(--accent); }
+  .poi-icon { font-size: 22px; }
+  .poi-lbl { font-size: 11px; text-align: center; color: var(--muted); }
+
+  /* TELA DE RESULTADO */
+  #screen-result {
+    display: none; flex-direction: column;
+    height: 100vh; overflow-y: auto;
+  }
+  #map-result { height: 45vh; flex-shrink: 0; }
+  .result-body { padding: 20px 20px 40px; background: var(--bg); }
+  .result-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
+  }
+  .result-header h2 { font-size: 20px; font-weight: 700; }
+  .result-date { font-size: 12px; color: var(--muted); }
+  .kpi-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px;
+  }
+  .kpi-card-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px; font-weight: 600;
+  }
+  .kpi-card-lbl { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Speed bar */
+  .speed-bar-wrap { margin-bottom: 20px; }
+  .speed-bar-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .speed-bar-track {
+    height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, var(--speed-low), var(--speed-mid), var(--speed-high));
+    position: relative; margin-bottom: 4px;
+  }
+  .speed-bar-markers { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* Eventos */
+  .section-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+  .event-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .event-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .event-icon { font-size: 20px; flex-shrink: 0; }
+  .event-info { flex: 1; }
+  .event-name { font-size: 14px; font-weight: 500; }
+  .event-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .event-speed {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 15px; font-weight: 600;
+    padding: 4px 10px; border-radius: 8px;
+    background: var(--surface2);
+  }
+  .event-speed.ok { color: var(--accent); }
+  .event-speed.warn { color: var(--warn); }
+  .event-speed.danger { color: var(--danger); }
+
+  .empty-events {
+    text-align: center; padding: 24px; color: var(--muted);
+    font-size: 14px; background: var(--surface); border-radius: 12px;
+    margin-bottom: 24px;
+  }
+
+  /* Gráfico de velocidade simples */
+  .speed-chart { width: 100%; height: 80px; margin-bottom: 20px; }
+
+  .leaflet-container { background: #1a1a22 !important; }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 18px;
+    font-size: 13px; z-index: 3000;
+    animation: toastIn 0.2s ease;
+    white-space: nowrap;
+  }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } }
+
+  .gps-error {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 32px; text-align: center; z-index: 5000;
+  }
+  .gps-error h2 { font-size: 22px; margin-bottom: 12px; }
+  .gps-error p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<!-- TELA HOME -->
+<div id="screen-home">
+  <div class="home-logo">Via<span>Track</span></div>
+  <div class="home-hero">
+    <h1>Cada km<br><em>registrado.</em></h1>
+    <p>Velocidade, POIs e eventos automáticos — tudo no mapa da sua viagem.</p>
+  </div>
+  <div class="home-stats">
+    <div class="home-stat">
+      <div class="home-stat-val" id="stat-viagens">0</div>
+      <div class="home-stat-lbl">Viagens</div>
+    </div>
+    <div class="home-stat">
+      <div class="home-stat-val" id="stat-km">0</div>
+      <div class="home-stat-lbl">km total</div>
+    </div>
+    <div class="home-stat">
+      <div class="home-stat-val" id="stat-maxspeed">0</div>
+      <div class="home-stat-lbl">km/h máx</div>
+    </div>
+  </div>
+  <button class="btn-primary" onclick="startRecording()">▶ Iniciar viagem</button>
+  <button class="btn-secondary" onclick="showHistory()" id="btn-history" style="display:none">Ver histórico</button>
+</div>
+
+<!-- TELA DE GRAVAÇÃO -->
+<div id="screen-recording">
+  <div style="position:relative; flex:1; min-height:0;">
+    <div id="map"></div>
+    <div class="map-hud">
+      <div class="hud-speed">
+        <div class="hud-speed-val" id="hud-speed-val">0</div>
+        <div class="hud-speed-unit">km/h</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+        <div class="hud-status">
+          <div class="hud-dot" id="hud-dot"></div>
+          <span class="hud-status-txt">REC</span>
+        </div>
+        <div class="hud-time" id="hud-time" style="background:rgba(13,13,15,0.85);padding:6px 10px;border-radius:10px;border:1px solid var(--border)">00:00</div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-panel">
+    <div class="mini-kpis">
+      <div class="mini-kpi">
+        <div class="mini-kpi-val" id="kpi-max" style="color:var(--danger)">0</div>
+        <div class="mini-kpi-lbl">Máx km/h</div>
+      </div>
+      <div class="mini-kpi">
+        <div class="mini-kpi-val" id="kpi-avg" style="color:var(--warn)">0</div>
+        <div class="mini-kpi-lbl">Média km/h</div>
+      </div>
+      <div class="mini-kpi">
+        <div class="mini-kpi-val" id="kpi-dist" style="color:var(--accent)">0.0</div>
+        <div class="mini-kpi-lbl">km</div>
+      </div>
+      <div class="mini-kpi">
+        <div class="mini-kpi-val" id="kpi-pois" style="color:var(--text)">0</div>
+        <div class="mini-kpi-lbl">POIs</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-stop" onclick="stopRecording()">⏹ Encerrar</button>
+      <button class="btn-poi" onclick="openPoiModal()">📍 Marcar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL POI -->
+<div class="modal-overlay" id="poi-modal" onclick="closePoiModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Marcar ponto de interesse</div>
+    <div class="poi-grid">
+      <button class="poi-btn" onclick="addPoi('radar','📷','Radar')"><span class="poi-icon">📷</span><span class="poi-lbl">Radar</span></button>
+      <button class="poi-btn" onclick="addPoi('pedagio','🚧','Pedágio')"><span class="poi-icon">🚧</span><span class="poi-lbl">Pedágio</span></button>
+      <button class="poi-btn" onclick="addPoi('blitz','🚔','Blitz')"><span class="poi-icon">🚔</span><span class="poi-lbl">Blitz</span></button>
+      <button class="poi-btn" onclick="addPoi('buraco','🕳️','Buraco')"><span class="poi-icon">🕳️</span><span class="poi-lbl">Buraco</span></button>
+      <button class="poi-btn" onclick="addPoi('acidente','🚨','Acidente')"><span class="poi-icon">🚨</span><span class="poi-lbl">Acidente</span></button>
+      <button class="poi-btn" onclick="addPoi('obra','🦺','Obra')"><span class="poi-icon">🦺</span><span class="poi-lbl">Obra</span></button>
+      <button class="poi-btn" onclick="addPoi('posto','⛽','Posto')"><span class="poi-icon">⛽</span><span class="poi-lbl">Posto</span></button>
+      <button class="poi-btn" onclick="addPoi('lombada','🔶','Lombada')"><span class="poi-icon">🔶</span><span class="poi-lbl">Lombada</span></button>
+      <button class="poi-btn" onclick="addPoi('parada','☕','Parada')"><span class="poi-icon">☕</span><span class="poi-lbl">Parada</span></button>
+      <button class="poi-btn" onclick="addPoi('zona_escolar','🏫','Zona Escolar')"><span class="poi-icon">🏫</span><span class="poi-lbl">Zona Escolar</span></button>
+      <button class="poi-btn" onclick="addPoi('borracharia','🔧','Borracharia')"><span class="poi-icon">🔧</span><span class="poi-lbl">Borracharia</span></button>
+      <button class="poi-btn" onclick="addPoi('alagamento','🌊','Alagamento')"><span class="poi-icon">🌊</span><span class="poi-lbl">Alagamento</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- TELA RESULTADO -->
+<div id="screen-result">
+  <div id="map-result"></div>
+  <div class="result-body">
+    <div class="result-header">
+      <div>
+        <h2>Viagem concluída</h2>
+        <div class="result-date" id="result-date"></div>
+      </div>
+      <button class="btn-secondary" style="width:auto;padding:10px 16px;font-size:13px;" onclick="showHome()">← Início</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-card-val" style="color:var(--danger)" id="r-maxspeed">0</div>
+        <div class="kpi-card-lbl">Máx km/h</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-val" style="color:var(--warn)" id="r-avgspeed">0</div>
+        <div class="kpi-card-lbl">Média km/h</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-val" style="color:var(--accent)" id="r-dist">0</div>
+        <div class="kpi-card-lbl">km percorridos</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card-val" id="r-duration">0</div>
+        <div class="kpi-card-lbl">Duração</div>
+      </div>
+    </div>
+
+    <div class="speed-bar-wrap">
+      <div class="speed-bar-label">Faixa de velocidade</div>
+      <div class="speed-bar-track"></div>
+      <div class="speed-bar-markers">
+        <span id="r-minspeed">0 km/h</span>
+        <span id="r-midspeed">— km/h</span>
+        <span id="r-maxspeed2">0 km/h</span>
+      </div>
+    </div>
+
+    <canvas class="speed-chart" id="speed-chart"></canvas>
+
+    <div class="section-title">Pontos de interesse</div>
+    <div class="event-list" id="poi-list"></div>
+
+    <div class="section-title">Eventos automáticos</div>
+    <div class="event-list" id="auto-events-list"></div>
+
+    <button class="btn-primary" onclick="showHome()">Nova viagem</button>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let map, mapResult;
+let recording = false;
+let watchId = null;
+let trackPoints = []; // {lat, lon, speed, ts}
+let pois = [];        // {type, icon, name, lat, lon, speed, ts}
+let autoEvents = [];
+let startTime = null;
+let timerInterval = null;
+let polylines = [];
+let currentPos = null;
+let currentMarker = null;
+let sessions = JSON.parse(localStorage.getItem('viatrack_sessions') || '[]');
+
+// ── Screens ─────────────────────────────────────────────────────────
+function showHome() {
+  document.getElementById('screen-home').style.display = 'flex';
+  document.getElementById('screen-recording').style.display = 'none';
+  document.getElementById('screen-result').style.display = 'none';
+  updateHomeStats();
+}
+function showRecording() {
+  document.getElementById('screen-home').style.display = 'none';
+  document.getElementById('screen-recording').style.display = 'flex';
+  document.getElementById('screen-result').style.display = 'none';
+}
+function showResult() {
+  document.getElementById('screen-home').style.display = 'none';
+  document.getElementById('screen-recording').style.display = 'none';
+  document.getElementById('screen-result').style.display = 'flex';
+}
+
+// ── Stats home ───────────────────────────────────────────────────────
+function updateHomeStats() {
+  document.getElementById('stat-viagens').textContent = sessions.length;
+  const totalKm = sessions.reduce((a, s) => a + (s.distKm || 0), 0);
+  document.getElementById('stat-km').textContent = totalKm.toFixed(0);
+  const maxAll = sessions.reduce((a, s) => Math.max(a, s.maxSpeed || 0), 0);
+  document.getElementById('stat-maxspeed').textContent = maxAll.toFixed(0);
+  if (sessions.length > 0) document.getElementById('btn-history').style.display = 'block';
+}
+
+// ── Map init ─────────────────────────────────────────────────────────
+function initMap(containerId) {
+  const m = L.map(containerId, { zoomControl: false, attributionControl: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19
+  }).addTo(m);
+  return m;
+}
+
+// ── Recording ────────────────────────────────────────────────────────
+function startRecording() {
+  if (!navigator.geolocation) {
+    showGpsError('Seu navegador não suporta GPS.');
+    return;
+  }
+  trackPoints = []; pois = []; autoEvents = []; polylines = [];
+  startTime = Date.now();
+
+  showRecording();
+
+  if (!map) {
+    map = initMap('map');
+  } else {
+    polylines.forEach(p => map.removeLayer(p));
+    polylines = [];
+    if (currentMarker) { map.removeLayer(currentMarker); currentMarker = null; }
+  }
+
+  recording = true;
+  startTimer();
+
+  watchId = navigator.geolocation.watchPosition(onPosition, onGpsError, {
+    enableHighAccuracy: true,
+    timeout: 10000,
+    maximumAge: 0
+  });
+}
+
+function onPosition(pos) {
+  const { latitude: lat, longitude: lon, speed } = pos.coords;
+  const speedKmh = speed != null ? Math.max(0, speed * 3.6) : 0;
+  const ts = Date.now();
+
+  const point = { lat, lon, speed: speedKmh, ts };
+  trackPoints.push(point);
+  currentPos = point;
+
+  // Atualiza HUD
+  const sv = document.getElementById('hud-speed-val');
+  sv.textContent = speedKmh.toFixed(0);
+  if (speedKmh < 60) sv.style.color = 'var(--speed-low)';
+  else if (speedKmh < 100) sv.style.color = 'var(--speed-mid)';
+  else sv.style.color = 'var(--speed-high)';
+
+  // KPIs mini
+  const speeds = trackPoints.map(p => p.speed);
+  document.getElementById('kpi-max').textContent = Math.max(...speeds).toFixed(0);
+  const avg = speeds.reduce((a,b)=>a+b,0)/speeds.length;
+  document.getElementById('kpi-avg').textContent = avg.toFixed(0);
+  document.getElementById('kpi-dist').textContent = calcDist().toFixed(1);
+  document.getElementById('kpi-pois').textContent = pois.length;
+
+  // Marker atual
+  const icon = L.divIcon({
+    className: '',
+    html: `<div style="width:16px;height:16px;border-radius:50%;background:var(--accent);border:3px solid white;box-shadow:0 0 8px rgba(0,229,160,0.6);"></div>`,
+    iconSize: [16,16], iconAnchor: [8,8]
+  });
+  if (currentMarker) map.removeLayer(currentMarker);
+  currentMarker = L.marker([lat, lon], { icon }).addTo(map);
+  map.setView([lat, lon], map.getZoom() < 15 ? 16 : map.getZoom());
+
+  // Desenha segmento colorido
+  if (trackPoints.length >= 2) {
+    const prev = trackPoints[trackPoints.length - 2];
+    const color = speedColor(speedKmh);
+    const seg = L.polyline([[prev.lat, prev.lon],[lat, lon]], {
+      color, weight: 5, opacity: 0.9, lineCap: 'round'
+    }).addTo(map);
+    polylines.push(seg);
+  }
+
+  // Eventos automáticos
+  checkAutoEvents(point);
+}
+
+function checkAutoEvents(point) {
+  if (trackPoints.length < 3) return;
+  const prev = trackPoints[trackPoints.length - 2];
+  const diff = point.speed - prev.speed;
+  const dt = (point.ts - prev.ts) / 1000;
+  if (dt === 0) return;
+  const accel = diff / dt;
+
+  if (accel < -8 && point.speed < 80) {
+    autoEvents.push({ type: 'freagem', icon: '🛑', name: 'Frenagem brusca', speed: point.speed, lat: point.lat, lon: point.lon, ts: point.ts });
+    toast('🛑 Frenagem brusca detectada');
+  }
+  if (accel > 5 && point.speed > 20) {
+    autoEvents.push({ type: 'aceleracao', icon: '🏎️', name: 'Aceleração brusca', speed: point.speed, lat: point.lat, lon: point.lon, ts: point.ts });
+  }
+}
+
+function onGpsError(err) {
+  if (err.code === 1) showGpsError('Permissão de GPS negada. Habilite nas configurações do browser.');
+  else toast('⚠️ Sinal de GPS fraco...');
+}
+
+function stopRecording() {
+  if (!recording) return;
+  recording = false;
+  clearInterval(timerInterval);
+  if (watchId) navigator.geolocation.clearWatch(watchId);
+
+  const duration = Date.now() - startTime;
+  const speeds = trackPoints.map(p => p.speed);
+  const maxSpeed = speeds.length ? Math.max(...speeds) : 0;
+  const avgSpeed = speeds.length ? speeds.reduce((a,b)=>a+b,0)/speeds.length : 0;
+  const distKm = calcDist();
+
+  const session = {
+    id: Date.now(), date: new Date().toISOString(),
+    trackPoints, pois, autoEvents,
+    maxSpeed, avgSpeed, distKm, duration
+  };
+  sessions.push(session);
+  localStorage.setItem('viatrack_sessions', JSON.stringify(sessions));
+
+  showResultScreen(session);
+}
+
+// ── Result ────────────────────────────────────────────────────────────
+function showResultScreen(session) {
+  showResult();
+
+  const d = new Date(session.date);
+  document.getElementById('result-date').textContent =
+    d.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long' }) +
+    ' · ' + d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+
+  document.getElementById('r-maxspeed').textContent = session.maxSpeed.toFixed(0);
+  document.getElementById('r-avgspeed').textContent = session.avgSpeed.toFixed(0);
+  document.getElementById('r-dist').textContent = session.distKm.toFixed(2);
+
+  const dur = session.duration;
+  const m = Math.floor(dur/60000), s = Math.floor((dur%60000)/1000);
+  document.getElementById('r-duration').textContent = `${m}m ${s}s`;
+
+  const speeds = session.trackPoints.map(p=>p.speed);
+  const minS = speeds.length ? Math.min(...speeds) : 0;
+  const midS = session.avgSpeed;
+  document.getElementById('r-minspeed').textContent = minS.toFixed(0)+' km/h';
+  document.getElementById('r-midspeed').textContent = midS.toFixed(0)+' km/h';
+  document.getElementById('r-maxspeed2').textContent = session.maxSpeed.toFixed(0)+' km/h';
+
+  // Gráfico simples
+  drawSpeedChart(speeds);
+
+  // POIs
+  const poiList = document.getElementById('poi-list');
+  poiList.innerHTML = '';
+  if (session.pois.length === 0) {
+    poiList.innerHTML = '<div class="empty-events">Nenhum POI marcado nesta viagem</div>';
+  } else {
+    session.pois.forEach(p => {
+      const cls = p.speed < 60 ? 'ok' : p.speed < 100 ? 'warn' : 'danger';
+      poiList.innerHTML += `
+        <div class="event-item">
+          <div class="event-icon">${p.icon}</div>
+          <div class="event-info">
+            <div class="event-name">${p.name}</div>
+            <div class="event-sub">${new Date(p.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <div class="event-speed ${cls}">${p.speed.toFixed(0)} km/h</div>
+        </div>`;
+    });
+  }
+
+  // Auto events
+  const ael = document.getElementById('auto-events-list');
+  ael.innerHTML = '';
+  if (session.autoEvents.length === 0) {
+    ael.innerHTML = '<div class="empty-events">Nenhum evento automático detectado 👍</div>';
+  } else {
+    session.autoEvents.forEach(e => {
+      const cls = e.speed < 60 ? 'ok' : e.speed < 100 ? 'warn' : 'danger';
+      ael.innerHTML += `
+        <div class="event-item">
+          <div class="event-icon">${e.icon}</div>
+          <div class="event-info">
+            <div class="event-name">${e.name}</div>
+            <div class="event-sub">${new Date(e.ts).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+          </div>
+          <div class="event-speed ${cls}">${e.speed.toFixed(0)} km/h</div>
+        </div>`;
+    });
+  }
+
+  // Mapa resultado
+  setTimeout(() => {
+    if (!mapResult) mapResult = initMap('map-result');
+    else { mapResult.eachLayer(l => { if (!(l instanceof L.TileLayer)) mapResult.removeLayer(l); }); }
+
+    if (session.trackPoints.length >= 2) {
+      for (let i = 1; i < session.trackPoints.length; i++) {
+        const a = session.trackPoints[i-1], b = session.trackPoints[i];
+        L.polyline([[a.lat,a.lon],[b.lat,b.lon]], {
+          color: speedColor(b.speed), weight: 5, opacity: 0.9
+        }).addTo(mapResult);
+      }
+      const first = session.trackPoints[0], last = session.trackPoints[session.trackPoints.length-1];
+      L.circleMarker([first.lat,first.lon],{radius:8,color:'#fff',fillColor:'#00E5A0',fillOpacity:1,weight:2}).addTo(mapResult).bindTooltip('Início');
+      L.circleMarker([last.lat,last.lon],{radius:8,color:'#fff',fillColor:'#FF4455',fillOpacity:1,weight:2}).addTo(mapResult).bindTooltip('Fim');
+      const bounds = L.latLngBounds(session.trackPoints.map(p=>[p.lat,p.lon]));
+      mapResult.fitBounds(bounds, { padding: [20,20] });
+    }
+
+    session.pois.forEach(p => {
+      const icon = L.divIcon({
+        className:'', html:`<div style="font-size:20px;filter:drop-shadow(0 1px 3px #000)">${p.icon}</div>`,
+        iconSize:[28,28], iconAnchor:[14,14]
+      });
+      L.marker([p.lat,p.lon],{icon}).addTo(mapResult)
+       .bindPopup(`<b>${p.name}</b><br>${p.speed.toFixed(0)} km/h`);
+    });
+  }, 100);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+function speedColor(kmh) {
+  if (kmh < 40) return '#00E5A0';
+  if (kmh < 60) return '#7FD14E';
+  if (kmh < 80) return '#FFB020';
+  if (kmh < 100) return '#FF7A30';
+  return '#FF4455';
+}
+
+function calcDist() {
+  let d = 0;
+  for (let i = 1; i < trackPoints.length; i++) {
+    d += haversine(trackPoints[i-1], trackPoints[i]);
+  }
+  return d;
+}
+
+function haversine(a, b) {
+  const R = 6371, dLat = rad(b.lat-a.lat), dLon = rad(b.lon-a.lon);
+  const x = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+const rad = d => d * Math.PI / 180;
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    const elapsed = Date.now() - startTime;
+    const m = String(Math.floor(elapsed/60000)).padStart(2,'0');
+    const s = String(Math.floor((elapsed%60000)/1000)).padStart(2,'0');
+    document.getElementById('hud-time').textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+// ── POI Modal ─────────────────────────────────────────────────────────
+function openPoiModal() { document.getElementById('poi-modal').classList.add('open'); }
+function closePoiModal(e) {
+  if (e.target === document.getElementById('poi-modal')) document.getElementById('poi-modal').classList.remove('open');
+}
+function addPoi(type, icon, name) {
+  document.getElementById('poi-modal').classList.remove('open');
+  if (!currentPos) { toast('⚠️ Aguardando GPS...'); return; }
+  const poi = { type, icon, name, lat: currentPos.lat, lon: currentPos.lon, speed: currentPos.speed, ts: Date.now() };
+  pois.push(poi);
+  document.getElementById('kpi-pois').textContent = pois.length;
+  const mk = L.divIcon({
+    className:'', html:`<div style="font-size:22px;filter:drop-shadow(0 1px 4px #000)">${icon}</div>`,
+    iconSize:[28,28], iconAnchor:[14,14]
+  });
+  L.marker([currentPos.lat,currentPos.lon],{icon:mk}).addTo(map).bindPopup(`<b>${name}</b><br>${currentPos.speed.toFixed(0)} km/h`);
+  toast(`${icon} ${name} marcado · ${currentPos.speed.toFixed(0)} km/h`);
+}
+
+// ── Speed Chart ───────────────────────────────────────────────────────
+function drawSpeedChart(speeds) {
+  const canvas = document.getElementById('speed-chart');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.offsetWidth * window.devicePixelRatio;
+  canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const max = Math.max(...speeds, 1);
+  const step = W / (speeds.length - 1 || 1);
+  ctx.clearRect(0, 0, W, H);
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'rgba(0,229,160,0.3)');
+  grad.addColorStop(1,'rgba(0,229,160,0)');
+  ctx.beginPath();
+  speeds.forEach((s,i) => {
+    const x = i*step, y = H - (s/max)*H*0.9;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.lineTo((speeds.length-1)*step, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = '#00E5A0'; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  speeds.forEach((s,i) => {
+    const x = i*step, y = H - (s/max)*H*0.9;
+    i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ── GPS Error ─────────────────────────────────────────────────────────
+function showGpsError(msg) {
+  const d = document.createElement('div');
+  d.className = 'gps-error';
+  d.innerHTML = `<h2>📍 GPS necessário</h2><p>${msg}</p><br><button class="btn-primary" style="width:200px" onclick="this.parentElement.remove();showHome()">Voltar</button>`;
+  document.body.appendChild(d);
+}
+
+// ── History (placeholder) ─────────────────────────────────────────────
+function showHistory() {
+  if (sessions.length === 0) { toast('Nenhuma viagem ainda'); return; }
+  const last = sessions[sessions.length-1];
+  showResultScreen(last);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+updateHomeStats();
+</script>
+</body>
+</html>
